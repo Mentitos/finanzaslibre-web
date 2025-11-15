@@ -110,15 +110,47 @@
         var targetW = 720;
         var targetH = 1449;
         var scale = Math.min(vw/targetW, vh/targetH);
-        // Do not upscale above 1 unless you want the device bigger on large screens
-        // To allow upscaling, remove the Math.min with 1 below.
-        // scale = Math.min(scale, 1);
         holder.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+        // After scaling, ensure canvas backing resolution matches devicePixelRatio
+        ensureCanvasResolution();
+      }
+
+      // Ensure canvas internal pixel buffer matches devicePixelRatio so scaling
+      // doesn't make the UI look blurry or stretched. Works for CanvasKit canvases.
+      function ensureCanvasResolution(){
+        try{
+          var dpr = window.devicePixelRatio || 1;
+          var targetW = 720;
+          var targetH = 1449;
+          var canvases = holder.querySelectorAll('canvas');
+          canvases.forEach(function(c){
+            // Set CSS size to logical pixels (fills holder)
+            c.style.width = targetW + 'px';
+            c.style.height = targetH + 'px';
+            // Set backing store size to device pixels for crisp rendering
+            var desiredW = Math.round(targetW * dpr);
+            var desiredH = Math.round(targetH * dpr);
+            if(c.width !== desiredW || c.height !== desiredH){
+              c.width = desiredW;
+              c.height = desiredH;
+            }
+          });
+        }catch(e){}
       }
 
       window.addEventListener('resize', applyScale);
       // apply after a short delay to allow Flutter to inject elements
       setTimeout(applyScale, 50);
+      // also try again once Flutter finishes loading
+      setTimeout(function(){ applyScale(); }, 500);
+
+      // Run ensureCanvasResolution when new nodes (e.g. canvases) are added
+      var canvasObserver = new MutationObserver(function(mutations){
+        mutations.forEach(function(m){
+          if(m.addedNodes && m.addedNodes.length) ensureCanvasResolution();
+        });
+      });
+      canvasObserver.observe(holder, { childList: true, subtree: true });
     })();
   </script>
 
