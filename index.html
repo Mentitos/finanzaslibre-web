@@ -138,6 +138,64 @@
         }catch(e){}
       }
 
+      // Debug helper: log info about canvases and transformed elements
+      function debugState(){
+        try{
+          console.groupCollapsed('[debug] app-holder state');
+          console.log('devicePixelRatio:', window.devicePixelRatio);
+          var rect = holder.getBoundingClientRect();
+          console.log('holder rect:', rect.width, rect.height);
+          var canvases = holder.querySelectorAll('canvas');
+          console.log('canvases found:', canvases.length);
+          canvases.forEach(function(c, i){
+            console.log('canvas', i, 'cssW/H:', c.style.width, c.style.height, 'attrW/H:', c.width, c.height, 'bbox:', c.getBoundingClientRect());
+          });
+          // Find children with inline transform
+          var transformed = [];
+          holder.querySelectorAll('*').forEach(function(el){
+            var t = el.style && el.style.transform;
+            if(t) transformed.push({el:el, transform:t, tag:el.tagName, id:el.id, cls:el.className});
+          });
+          console.log('elements with inline transform:', transformed.length, transformed.slice(0,10));
+          console.groupEnd();
+        }catch(e){ console.warn('[debug] failed', e); }
+      }
+
+      // Aggressive normalizer: remove inline transforms and force child sizes
+      function normalizeFlutterElements(){
+        try{
+          var targetW = 720;
+          var targetH = 1449;
+          holder.querySelectorAll('*').forEach(function(el){
+            // remove inline transform that may cause double-scaling
+            if(el.style && el.style.transform){
+              el.style.transform = '';
+            }
+            // make children fill the holder
+            if(el !== holder){
+              el.style.width = '100%';
+              el.style.height = '100%';
+              el.style.maxWidth = '100%';
+              el.style.maxHeight = '100%';
+            }
+          });
+          // then fix canvases
+          var dpr = window.devicePixelRatio || 1;
+          holder.querySelectorAll('canvas').forEach(function(c){
+            c.style.width = targetW + 'px';
+            c.style.height = targetH + 'px';
+            var desiredW = Math.round(targetW * dpr);
+            var desiredH = Math.round(targetH * dpr);
+            if(c.width !== desiredW || c.height !== desiredH){
+              c.width = desiredW;
+              c.height = desiredH;
+            }
+            // ensure CSS display
+            c.style.display = 'block';
+          });
+        }catch(e){ console.warn('[normalize] failed', e); }
+      }
+
       window.addEventListener('resize', applyScale);
       // apply after a short delay to allow Flutter to inject elements
       setTimeout(applyScale, 50);
